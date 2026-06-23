@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Tranqui — navegá sin avenidas</title>
+
+  <!-- PWA / iOS -->
+  <meta name="theme-color" content="#0d3b32" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tranqui" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+
+  <link rel="stylesheet" href="vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Barra superior de busqueda -->
+  <div id="topbar">
+    <div class="search-wrap">
+      <input id="search" type="search" inputmode="search" autocomplete="off"
+             placeholder="¿A dónde vamos?" />
+      <button id="btn-clear" class="icon-btn" title="Limpiar" hidden>✕</button>
+    </div>
+    <button id="btn-settings" class="icon-btn round" title="Ajustes">⚙</button>
+    <ul id="results" hidden></ul>
+  </div>
+
+  <!-- Botones flotantes derecha -->
+  <div id="fabs">
+    <button id="btn-night" class="fab" title="Modo noche">🌙</button>
+    <button id="btn-recenter" class="fab" title="Centrar">◎</button>
+  </div>
+
+  <!-- Tarjeta de ruta (preview antes de empezar) -->
+  <div id="route-card" class="sheet" hidden>
+    <div class="route-head">
+      <div>
+        <div id="route-eta" class="route-eta">—</div>
+        <div id="route-meta" class="route-meta">—</div>
+      </div>
+      <button id="btn-close-route" class="icon-btn">✕</button>
+    </div>
+    <div id="avenue-stat" class="avenue-stat" hidden></div>
+    <label class="toggle-row">
+      <span>🚫 Evitar avenidas</span>
+      <input type="checkbox" id="toggle-avoid" />
+    </label>
+    <div id="no-key-note" class="note" hidden>
+      Para evitar avenidas necesitás una API key gratis de GraphHopper.
+      <button id="open-settings-link" class="linklike">Configurar ahora →</button>
+    </div>
+    <button id="btn-start" class="primary">Empezar ▸</button>
+  </div>
+
+  <!-- Banner de maniobra (durante navegacion) -->
+  <div id="nav-banner" class="hidden">
+    <div class="maneuver">
+      <div id="man-icon" class="man-icon">↑</div>
+      <div class="man-text">
+        <div id="man-dist" class="man-dist">—</div>
+        <div id="man-instr" class="man-instr">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra inferior de navegacion -->
+  <div id="nav-bottom" class="hidden">
+    <button id="btn-stop" class="stop">Salir</button>
+    <div class="trip">
+      <div><span id="trip-eta">—</span><small>llegada</small></div>
+      <div><span id="trip-rem">—</span><small>restante</small></div>
+      <div><span id="trip-dist">—</span><small>distancia</small></div>
+    </div>
+    <button id="btn-mute" class="icon-btn round" title="Voz">🔊</button>
+  </div>
+
+  <!-- Panel de ajustes -->
+  <div id="settings" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Ajustes</h2>
+        <button id="btn-close-settings" class="icon-btn">✕</button>
+      </div>
+
+      <label class="field">
+        <span>API key de GraphHopper <em>(gratis)</em></span>
+        <input id="gh-key" type="text" placeholder="pegá tu key acá" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="help">
+        Sin key la app rutea igual, pero <b>evitar avenidas</b> solo funciona con GraphHopper.
+        Es gratis (500 rutas/día): creá cuenta en
+        <a href="https://www.graphhopper.com/dashboard/#/register" target="_blank" rel="noopener">graphhopper.com</a>,
+        entrá a <b>API Keys</b> y pegá la key acá.
+      </p>
+
+      <label class="toggle-row">
+        <span>Evitar avenidas por defecto</span>
+        <input type="checkbox" id="set-avoid-default" />
+      </label>
+
+      <label class="field">
+        <span>Cuánto evitar avenidas: <b id="strength-label">Medio</b></span>
+        <input id="set-strength" type="range" min="1" max="3" step="1" value="2" />
+      </label>
+
+      <label class="toggle-row">
+        <span>Voz en las indicaciones</span>
+        <input type="checkbox" id="set-voice" checked />
+      </label>
+
+      <label class="toggle-row">
+        <span>Mapa en modo noche</span>
+        <input type="checkbox" id="set-night" />
+      </label>
+
+      <button id="btn-save-settings" class="primary">Guardar</button>
+      <p class="version">Tranqui · navegación por calles tranquilas</p>
+    </div>
+  </div>
+
+  <!-- Hint de instalacion en iOS -->
+  <div id="ios-hint" class="ios-hint" hidden>
+    <div class="ios-hint-card">
+      <b>Instalá Tranqui en tu iPhone</b>
+      <p>Tocá <span class="share-ico">⎙</span> <b>Compartir</b> abajo y elegí <b>“Agregar a inicio”</b>.</p>
+      <button id="ios-hint-close" class="primary">Entendido</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
