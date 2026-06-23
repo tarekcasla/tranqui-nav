@@ -212,11 +212,21 @@ async function computeAndShowRoute(){
   if (!state.pos) toast('Sin GPS: ruteo desde el centro del mapa');
 
   const avoid = el['toggle-avoid'].checked;
+  const dest = [state.dest.lng, state.dest.lat];
   toast('Calculando ruta…', 1500);
   try {
-    const route = (settings.ghKey)
-      ? await routeGraphHopper(origin, [state.dest.lng,state.dest.lat], avoid)
-      : await routeOSRM(origin, [state.dest.lng,state.dest.lat]);
+    let route;
+    if (settings.ghKey){
+      try {
+        route = await routeGraphHopper(origin, dest, avoid);
+      } catch (e){
+        console.error('GraphHopper falló:', e);
+        toast('⚠️ ' + (e.message || 'GraphHopper falló') + ' — uso ruta común', 5500);
+        route = await routeOSRM(origin, dest);
+      }
+    } else {
+      route = await routeOSRM(origin, dest);
+    }
     state.route = route;
     drawRoute(route);
     showRouteCard(route, avoid);
@@ -229,12 +239,14 @@ async function computeAndShowRoute(){
 
 // ---- GraphHopper (soporta evitar avenidas vía custom_model) ----
 async function routeGraphHopper(from, to, avoid){
+  // ch.disable:true es OBLIGATORIO para pedir 'details' y 'custom_model' en GraphHopper.
   const body = {
     profile:'car', locale:'es', points:[from, to],
-    points_encoded:false, instructions:true, details:['road_class'],
+    points_encoded:false, instructions:true,
+    'ch.disable': true,
+    details:['road_class'],
   };
   if (avoid){
-    body['ch.disable'] = true;
     const m = STRENGTH[settings.strength] || STRENGTH[2];
     body.custom_model = { priority:[
       { if:'road_class == MOTORWAY',  multiply_by:m.motorway  },
@@ -247,8 +259,10 @@ async function routeGraphHopper(from, to, avoid){
     method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body),
   });
   if (!r.ok){
-    if (r.status === 401) throw new Error('API key inválida — revisá Ajustes');
-    throw new Error('GraphHopper error ' + r.status);
+    let detail = '';
+    try { const ej = await r.json(); detail = ej.message || (ej.hints && ej.hints[0] && ej.hints[0].message) || ''; } catch(_){}
+    if (r.status === 401) throw new Error('API key inválida (revisá Ajustes)');
+    throw new Error('GraphHopper ' + r.status + (detail ? ': ' + detail : ''));
   }
   const data = await r.json();
   const path = data.paths[0];
