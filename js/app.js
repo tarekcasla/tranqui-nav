@@ -111,7 +111,7 @@ function initMap() {
   map.on('touchend',  ()=> clearTimeout(pressT));
   map.on('touchmove', ()=> clearTimeout(pressT));
   map.on('contextmenu', (e)=> setDestFromLngLat(e.lngLat, 'Punto en el mapa'));
-  map.on('dragstart', ()=>{ if (state.navActive) state.following = false; });
+  map.on('dragstart', ()=>{ state.following = false; });
 }
 function emptyFC(){ return { type:'FeatureCollection', features:[] }; }
 
@@ -159,7 +159,8 @@ function onPos(p){
   updateUserMarker();
   if (first && !state.dest) map.easeTo({ center:[c.longitude,c.latitude], zoom:15 });
   if (state.navActive) navTick();
-  else if (state.following && !state.dest) map.easeTo({ center:[c.longitude,c.latitude] });
+  // Fuera de navegación NO recentramos solos: el usuario mueve el mapa libre.
+  // El botón ◎ recentra a pedido.
 }
 function onPosErr(e){
   if (e.code === 1) toast('Activá la ubicación para navegar');
